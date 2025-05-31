@@ -73,8 +73,8 @@ export class HoneywellFanAccessory {
   async setActive(value: CharacteristicValue) {
     this.state.active = value as boolean;
     this.platform.log.debug('Set Characteristic On ->', value);
-    // If the fan is being turned on we set it to full speed
-    if (this.state.active) {
+    // If the fan is being turned off we set it to full speed
+    if (!this.state.active) {
       this.state.targetRotationSpeed = 100; // Set to 100% speed
       this.state.rotationSpeedSetting = RotationSpeedSetting.HIGH; // Set to high speed setting
     }
