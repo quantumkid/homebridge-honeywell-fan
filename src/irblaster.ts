@@ -5,10 +5,10 @@ import Queue from 'p-queue';
 import WebSocket from 'ws';
 
 export enum HoneywellFanIRBlasterCommand {
-    ONOFF = 'ONOFF',
-    SPEED = 'SPEED',
-    TIMER = 'TIMER',
-    OSCILLATE = 'OSCILLATE'
+  ONOFF = 'ONOFF',
+  SPEED = 'SPEED',
+  TIMER = 'TIMER',
+  OSCILLATE = 'OSCILLATE'
 }
 
 export class HoneywellFanIRBlaster {
@@ -28,11 +28,12 @@ export class HoneywellFanIRBlaster {
     this.ws = this.openSocket(this.context);
   }
 
-  openSocket(context: UnknownContext): WebSocket {
+  openSocket(context: UnknownContext, callback: () => void = () => {}): WebSocket {
     let ws = new WebSocket(`ws://${context.ip}:${context.port}`);
 
     ws.on('open', () => {
       this.platform.log.debug('Web socket open');
+      callback();
     });
 
     ws.on('error', (error) => {
@@ -47,13 +48,28 @@ export class HoneywellFanIRBlaster {
   }
 
   sendCommand(command: HoneywellFanIRBlasterCommand, n: number = 1) {
-    if (this.ws === undefined || this.ws.readyState !== WebSocket.OPEN) {
-      this.platform.log.debug('Web socket is not open, reopening...');
-      this.ws = this.openSocket(this.context);
+    // Attempt to ping the websocket to ensure it's open
+    if (this.ws.readyState === WebSocket.OPEN) {
+      this.ws.ping((error: { message: any }) => {
+        if (error) {
+          this.platform.log.error(`Web socket ping failed: ${error.message}`);
+          this.ws.terminate();
+          this.ws = this.openSocket(this.context, this._sendCommand.bind(this, command, n));
+        } else {
+          this.platform.log.debug('Web socket ping successful');
+          this._sendCommand(command, n);
+        }
+      });
+    } else {
+      this.platform.log.error(`Web socket is closed, creating a new one`);
+      this.ws.terminate();
+      this.ws = this.openSocket(this.context, this._sendCommand.bind(this, command, n));
     }
+  }
 
+  _sendCommand(command: HoneywellFanIRBlasterCommand, n: number = 1) {
     this.platform.log.debug(`Sending ${command} ${n} times`);
-    for(let i = 0; i < n; i++) {
+    for (let i = 0; i < n; i++) {
       this.queue.add(async () => {
         this.platform.log.debug(`-> Sending command ${command}`);
         this.ws.send(command.valueOf());
@@ -62,5 +78,4 @@ export class HoneywellFanIRBlaster {
       });
     }
   }
-
 }
