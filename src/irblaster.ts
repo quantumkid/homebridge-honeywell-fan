@@ -25,18 +25,33 @@ export class HoneywellFanIRBlaster {
       baseURL: `http://${this.context.host}`,
     });
     this.platform.log.debug(`Web socket url: ${this.context.ip}:${this.context.port}`);
-    this.ws = new WebSocket(`ws://${this.context.ip}:${this.context.port}`);
+    this.ws = this.openSocket(this.context);
+  }
 
-    this.ws.on('open', () => {
+  openSocket(context: UnknownContext): WebSocket {
+    let ws = new WebSocket(`ws://${context.ip}:${context.port}`);
+
+    ws.on('open', () => {
       this.platform.log.debug('Web socket open');
     });
 
-    this.ws.on('error', (error) => {
+    ws.on('error', (error) => {
       this.platform.log.error(`Unable to open the web socket: ${error.message}`);
     });
+
+    ws.on('close', () => {
+      this.platform.log.debug('Web socket closed');
+    });
+
+    return ws;
   }
 
   sendCommand(command: HoneywellFanIRBlasterCommand, n: number = 1) {
+    if (this.ws === undefined || this.ws.readyState !== WebSocket.OPEN) {
+      this.platform.log.debug('Web socket is not open, reopening...');
+      this.ws = this.openSocket(this.context);
+    }
+
     this.platform.log.debug(`Sending ${command} ${n} times`);
     for(let i = 0; i < n; i++) {
       this.queue.add(async () => {
