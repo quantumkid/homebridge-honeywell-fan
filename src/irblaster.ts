@@ -14,22 +14,19 @@ export enum HoneywellFanIRBlasterCommand {
 export class HoneywellFanIRBlaster {
 
   private queue = new Queue({ concurrency: 1, autoStart: true });
-  private axios: AxiosInstance;
   private ws: WebSocket;
 
   constructor(
     private readonly platform: HoneywellFanHomebridgePlatform,
     private readonly context: UnknownContext,
   ) {
-    this.axios = Axios.create({
-      baseURL: `http://${this.context.host}`,
-    });
     this.platform.log.debug(`Web socket url: ${this.context.ip}:${this.context.port}`);
     this.ws = this.openSocket(this.context);
   }
 
   openSocket(context: UnknownContext, callback: () => void = () => {}): WebSocket {
     let ws = new WebSocket(`ws://${context.ip}:${context.port}`);
+    this.platform.log.debug(`Connecting to web socket at ws://${context.ip}:${context.port}...`);
 
     ws.on('open', () => {
       this.platform.log.debug('Web socket open');
@@ -53,7 +50,6 @@ export class HoneywellFanIRBlaster {
       this.ws.ping((error: { message: any }) => {
         if (error) {
           this.platform.log.error(`Web socket ping failed: ${error.message}`);
-          this.ws.terminate();
           this.ws = this.openSocket(this.context, this._sendCommand.bind(this, command, n));
         } else {
           this.platform.log.debug('Web socket ping successful');
@@ -62,7 +58,6 @@ export class HoneywellFanIRBlaster {
       });
     } else {
       this.platform.log.error(`Web socket is closed, creating a new one`);
-      this.ws.terminate();
       this.ws = this.openSocket(this.context, this._sendCommand.bind(this, command, n));
     }
   }
